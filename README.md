@@ -1,16 +1,52 @@
-# trends_surfer
+<div align="center">
 
-A Claude Code plugin that lets Claude answer Google Trends questions in plain
-language. Ask *"compare interest in bitcoin vs ethereum over the last 3 months
-and show me the rising related queries"* — Claude maps that to a `trends_fetch`
-call, the plugin pulls the data through a stealth Chrome session, saves the full
-result to a temp file, and returns only a compact index. Claude then reads the
-exact slice it needs with `trends_query`.
+```
+   ████████╗██████╗ ███████╗███╗   ██╗██████╗ ███████╗
+   ╚══██╔══╝██╔══██╗██╔════╝████╗  ██║██╔══██╗██╔════╝
+      ██║   ██████╔╝█████╗  ██╔██╗ ██║██║  ██║███████╗
+      ██║   ██╔══██╗██╔══╝  ██║╚██╗██║██║  ██║╚════██║
+      ██║   ██║  ██║███████╗██║ ╚████║██████╔╝███████║
+      ╚═╝   ╚═╝  ╚═╝╚══════╝╚═╝  ╚═══╝╚═════╝ ╚══════╝
+   ███████╗██╗   ██╗██████╗ ███████╗███████╗██████╗
+   ██╔════╝██║   ██║██╔══██╗██╔════╝██╔════╝██╔══██╗
+   ███████╗██║   ██║██████╔╝█████╗  █████╗  ██████╔╝
+   ╚════██║██║   ██║██╔══██╗██╔══╝  ██╔══╝  ██╔══██╗
+   ███████║╚██████╔╝██║  ██║██║     ███████╗██║  ██║
+   ╚══════╝ ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝
+
+                                    ▄▄▄▄▄
+                               ▄▄████████████▄▄
+                           ▄████████████████████▄          ▟▙
+                        ▄████████▀▀      ▀▀████████▄      ▝████▘
+                      ▄██████▀▀     ▄▄       ▀██████▄       ██
+                     ████████      ████        ▀█████▄    ▗▟██▙▖
+                    ▐████████      ▀██▘          ██████▌    ▀▀▀
+   ░░░░░░░░░░░░░░░░░░▜████████▄▄         ▄▄▄▄▄▟███████▘░░░░░░░░░░░░
+   ≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈▀▀████████████████████████▀▀≈≈≈≈≈≈≈≈≈≈≈≈≈≈≈
+
+           ride the data wave · catch trends before they crest
+```
+
+**Natural-language Google Trends for Claude — through a stealth browser.**
+
+</div>
+
+---
+
+**Trends Surfer** is a Claude Code plugin that lets Claude answer Google Trends
+questions in plain language. Ask *"compare interest in bitcoin vs ethereum over
+the last 3 months and show me the rising related queries"* — Claude maps that to
+a `trends_fetch` call, the plugin pulls the data through a stealth Chrome
+session, saves the full result to a temp file, and returns only a compact index.
+Claude then reads the exact slice it needs with `trends_query`.
+
+> The MCP server, package and tools keep the identifier `trends_surfer` /
+> `trends_*`; **Trends Surfer** is just the friendly name.
 
 ## Why not pytrends directly
 
 pytrends was archived in April 2025 and its `requests`-based calls carry
-Python's TLS fingerprint, which Google rate-limits and blocks. This plugin
+Python's TLS fingerprint, which Google rate-limits and blocks. Trends Surfer
 re-implements the modern Trends endpoints and calls them via **in-page
 `fetch()`** from a page already on `trends.google.com`, so every request
 inherits a real Chrome's JA3 fingerprint and the live session cookies.
@@ -88,6 +124,6 @@ to reuse an existing `DISPLAY`).
 Google's old `/api/dailytrends` JSON endpoint now returns 404, so trending-now
 is pulled from the current `/trending/rss?geo=XX` feed instead. Google also
 rate-limits the widget calls with HTTP 429 (heavily on datacenter IPs); the
-fetcher retries with backoff, and on a residential IP this is usually
-transient. The Google-facing logic is isolated in `trends.py` for easy
-re-adaptation when endpoints shift again.
+fetcher retries with an exponential backoff that honors `Retry-After`, and on a
+residential IP this is usually transient. The Google-facing logic is isolated in
+`trends.py` for easy re-adaptation when endpoints shift again.
