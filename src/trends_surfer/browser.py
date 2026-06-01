@@ -1,4 +1,4 @@
-"""Stealth Chrome session, ported from Lea/auto-ninja-linking.
+"""Stealth Chrome session.
 
 Strategy (most-furtive first), trimmed to what Trends needs:
 
@@ -42,7 +42,6 @@ _VIEWPORT_POOL = (
 )
 
 # 20-point belt-and-braces stealth, injected before any page script runs.
-# Verbatim from Lea/auto-ninja-linking playwright_engine.py (audited 2026-05).
 _STEALTH_INIT_SCRIPT = r"""
 (() => {
   try { Object.defineProperty(navigator, 'webdriver', { get: () => undefined }); } catch (e) {}

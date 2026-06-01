@@ -1,9 +1,9 @@
 """Get past Google's consent wall + a Cloudflare Turnstile, if present.
 
-The Turnstile click-through is ported from Lea/auto-ninja-linking captcha.py
-(``try_click_turnstile`` and its humanisation helpers), trimmed to the
-click-only path — no paid solver. ``pass_protections`` is the single entry
-point the session calls after each navigation.
+The Turnstile click-through (``try_click_turnstile`` and its humanisation
+helpers) is trimmed to the click-only path — no paid solver.
+``pass_protections`` is the single entry point the session calls after each
+navigation.
 """
 from __future__ import annotations
 

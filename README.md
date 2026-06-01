@@ -17,10 +17,10 @@ inherits a real Chrome's JA3 fingerprint and the live session cookies.
 
 ## How the protections work
 
-- **Anti-detection** (ported from the `auto-ninja-linking` project): Patchright
-  + the real Google Chrome binary, headful under Xvfb, a 20-point stealth init
-  script, and a humanised click-through for Cloudflare Turnstile (no paid
-  solver). A persistent Chrome profile keeps cookies warm across calls.
+- **Anti-detection**: Patchright + the real Google Chrome binary, headful under
+  Xvfb, a 20-point stealth init script, and a humanised click-through for
+  Cloudflare Turnstile (no paid solver). A persistent Chrome profile keeps
+  cookies warm across calls.
 - **Non-bypassable rate limit**: a randomized minimum delay (default **30–90s**)
   is enforced *inside the server* between `trends_fetch` calls. There is no
   parameter to skip it, the wait happens while the tool call blocks, and the
