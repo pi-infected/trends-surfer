@@ -1,0 +1,7 @@
+.data/
+.venv/
+__pycache__/
+*.pyc
+
+# Research artifacts — kept locally, excluded from git and from the plugin install
+research/

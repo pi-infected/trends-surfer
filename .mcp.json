@@ -1,0 +1,12 @@
+{
+  "trends_surfer": {
+    "command": "uv",
+    "args": ["run", "--directory", "${CLAUDE_PLUGIN_ROOT}", "trends-surfer-server"],
+    "env": {
+      "TTT_MIN_DELAY": "30",
+      "TTT_MAX_DELAY": "90",
+      "TTT_FORCE_XVFB": "1",
+      "TTT_DATA_DIR": "${CLAUDE_PLUGIN_ROOT}/.data"
+    }
+  }
+}

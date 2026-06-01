@@ -1,0 +1,10 @@
+{
+  "name": "trends_surfer",
+  "version": "0.1.0",
+  "description": "Natural-language access to Google Trends. Claude asks in plain language; the plugin drives a stealth Chrome session (Patchright + anti-detection) to pull interest-over-time, related queries/topics, interest-by-region and trending-now, writes the full result to a temp file, and returns only a compact index. A non-bypassable randomized delay (30-90s) is enforced server-side between requests.",
+  "author": {
+    "name": "pirolla40",
+    "email": "pirolla40@gmail.com"
+  },
+  "keywords": ["google-trends", "pytrends", "mcp", "anti-detection", "patchright"]
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "trends-surfer-local",
+  "description": "Local marketplace for the trends_surfer plugin.",
+  "owner": {
+    "name": "pirolla40",
+    "email": "pirolla40@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "trends_surfer",
+      "description": "Natural-language Google Trends via a stealth browser (Patchright anti-detection), with a non-bypassable randomized rate limit, results written to temp files (compact index returned), and a generic opportunity-finding playbook prompt.",
+      "author": {
+        "name": "pirolla40"
+      },
+      "category": "research",
+      "source": "./"
+    }
+  ]
+}
