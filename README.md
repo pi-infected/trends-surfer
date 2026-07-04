@@ -74,15 +74,25 @@ argument to scope the run. The text lives in `src/trends_surfer/playbook.py`.
 ## Requirements
 
 - `uv` (the MCP server is launched via `uv run`)
-- `Xvfb` on the host (headful Chrome beats Turnstile; without it Chrome runs
-  headless and Turnstile is much more likely to fail)
-- The real Chrome binary:
+- Headful Chrome beats Turnstile; without it Chrome runs headless and
+  Turnstile is much more likely to fail. **Linux only:** since a Linux host
+  usually has no display, this plugin fakes one with `Xvfb`. **Windows**
+  already has a real desktop session, so headful Chrome runs natively there
+  with no extra setup (`browser.py`'s `_IS_WINDOWS` guard). **macOS is not yet
+  handled** — the code has no `_IS_MACOS` branch, so on a Mac it currently
+  falls through to the Linux Xvfb/`chrome_available()` paths, which are wrong
+  for that OS (no `Xvfb`, wrong Chrome path) and will likely fail Turnstile
+  the same way unpatched Windows did.
+- The real Chrome binary (checked at the standard per-OS install paths, e.g.
+  `%ProgramFiles%\Google\Chrome\Application\chrome.exe` on Windows or
+  `/usr/bin/google-chrome` on Linux) — or let `patchright install chrome`
+  fetch its own build.
 
 ```bash
 cd trends-surfer
 uv sync                      # installs deps into .venv (Python pinned to 3.12)
 uv run patchright install chrome    # or: uv run playwright install chromium
-# Debian/Ubuntu: sudo apt-get install -y xvfb
+# Linux only: sudo apt-get install -y xvfb (Debian/Ubuntu)
 ```
 
 ## Smoke test
@@ -105,7 +115,48 @@ the four `trends_*` tools appear and `trends_health` reports
 Configuration via `.mcp.json` env: `TTT_MIN_DELAY`, `TTT_MAX_DELAY`,
 `TTT_DATA_DIR`, and `TTT_FORCE_XVFB` (default `1` — always run Chrome on a
 private virtual display so no window ever appears on your desktop; set to `0`
-to reuse an existing `DISPLAY`).
+to reuse an existing `DISPLAY`). `TTT_FORCE_XVFB` is a Linux-only knob — on
+Windows it's ignored since headful Chrome runs on the real desktop directly
+(a visible Chrome window will appear there).
+
+## Moving this plugin to a new Windows machine
+
+Copying this folder to another Windows PC and installing it there is not just
+"copy + `/plugin install`" — a couple of machine-local pieces don't travel
+with the folder. If an AI agent is doing this setup, follow these steps in
+order and verify each before moving on:
+
+1. **Copy the folder**, excluding `.venv/`, `.data/`, `research/`,
+   `__pycache__/` (all gitignored/generated — regenerate, don't copy; `.venv`
+   in particular is machine-specific and copying it will not work).
+2. **Check for `uv`**: run `uv --version`. If missing, install with
+   `python -m pip install --user uv`, then re-check.
+3. **Install the browser binary** (this is the step that is easy to miss —
+   it does *not* happen automatically when the MCP server starts):
+   ```
+   cd <copied-folder>
+   uv run patchright install chrome
+   ```
+   If it reports Chrome is already installed on the system, that's fine —
+   `chrome_available()` will find it at the standard install path either way.
+4. **Register and install the plugin**:
+   ```
+   /plugin marketplace add <absolute-path-to-copied-folder>
+   /plugin install trends_surfer@trends-surfer-local
+   /reload-plugins
+   ```
+5. **Verify** by calling the `trends_health` tool. Expect
+   `"chrome_available": true` and `"xvfb_headful": true`. If either is
+   `false`, re-check steps 2-3 rather than assuming the code is broken —
+   this exact code was already verified working on Windows elsewhere.
+6. **Known gotcha on reinstall**: if the plugin is ever uninstalled and
+   reinstalled in the same session, `/plugin install` can fail with
+   `EPERM: operation not permitted, rm` on the plugin's cached `.venv`. This
+   means a previous `trends-surfer-server`/`uv.exe`/`python.exe` process (from
+   the old install) is still running and holding files open. Find and stop
+   them first (e.g. via `Get-CimInstance Win32_Process` filtered on
+   `trends-surfer-local` or `trends_surfer`, then `Stop-Process -Force`),
+   *then* retry the install.
 
 ### Notes on Google's moving target
 

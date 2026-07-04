@@ -12,8 +12,11 @@ Strategy (most-furtive first), trimmed to what Trends needs:
      regression; the underlying CDP call is unaffected).
 
 We run **headful under Xvfb** because headless Chrome reliably fails
-Cloudflare Turnstile. A **persistent user-data-dir** keeps cookies (NID,
-consent) warm across calls so we rarely re-hit consent/Turnstile.
+Cloudflare Turnstile. On Linux that means faking a display with Xvfb; on
+Windows/macOS a real desktop session already provides one, so headful Chrome
+runs natively there with no virtual-display step at all. A **persistent
+user-data-dir** keeps cookies (NID, consent) warm across calls so we rarely
+re-hit consent/Turnstile.
 
 The session is exposed as ``open_session(profile_dir)`` — an async context
 manager yielding a ready Playwright ``Page``.
@@ -25,9 +28,11 @@ import os
 import random
 import shutil
 import subprocess
+import sys
 import time
 from contextlib import asynccontextmanager
 
+_IS_WINDOWS = sys.platform.startswith("win")
 _XVFB_DISPLAY = ":99"
 _xvfb_ready: bool | None = None
 
@@ -210,7 +215,13 @@ def ensure_xvfb() -> bool:
 
     Returns True when headful is safe, False when the caller must fall back to
     headless (which Cloudflare Turnstile reliably fails). Idempotent + cached.
+
+    On Windows/macOS a real desktop session already provides a display, so
+    there's nothing to fake here — always headful, no Xvfb involved.
     """
+    if _IS_WINDOWS:
+        return True
+
     global _xvfb_ready
     if _xvfb_ready is not None:
         return _xvfb_ready
@@ -257,6 +268,22 @@ def chrome_available() -> bool:
     Checks the system install paths AND whether ``patchright install chrome``
     has placed a chrome build in the Playwright browsers cache.
     """
+    if _IS_WINDOWS:
+        win_paths = (
+            os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
+        )
+        if any(os.path.exists(p) for p in win_paths):
+            return True
+        cache = os.environ.get("PLAYWRIGHT_BROWSERS_PATH") or os.path.expandvars(
+            r"%LOCALAPPDATA%\ms-playwright"
+        )
+        try:
+            return any(name.startswith("chrome") for name in os.listdir(cache))
+        except Exception:
+            return False
+
     sys_paths = (
         "/opt/google/chrome/chrome",
         "/usr/bin/google-chrome",

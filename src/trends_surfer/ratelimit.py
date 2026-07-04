@@ -48,7 +48,7 @@ class RateLimiter:
     # ── persistent timestamp ────────────────────────────────────────────
     def _read_last_ts(self) -> float:
         try:
-            data = json.loads(self._state_path.read_text())
+            data = json.loads(self._state_path.read_text(encoding="utf-8"))
             return float(data.get("last_request_ts", 0.0))
         except Exception:
             return 0.0
@@ -57,7 +57,7 @@ class RateLimiter:
         try:
             self._state_path.parent.mkdir(parents=True, exist_ok=True)
             tmp = self._state_path.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"last_request_ts": ts}))
+            tmp.write_text(json.dumps({"last_request_ts": ts}), encoding="utf-8")
             tmp.replace(self._state_path)  # atomic on POSIX
         except Exception:
             # Failing to persist must not crash a fetch; worst case the next
