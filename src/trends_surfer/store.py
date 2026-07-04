@@ -44,8 +44,8 @@ def write_result(data_dir: str, meta: dict, sections: dict) -> tuple[str, str]:
     md_path = rdir / f"{base}.md"
 
     payload = {"meta": meta, "sections": sections}
-    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2))
-    md_path.write_text(_render_markdown(meta, sections))
+    json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    md_path.write_text(_render_markdown(meta, sections), encoding="utf-8")
     return str(json_path), str(md_path)
 
 
@@ -150,7 +150,7 @@ def query(file: str, section: str, keyword: str | None = None, top: int | None =
     p = Path(file)
     if not p.exists():
         return {"error": f"file not found: {file}"}
-    payload = json.loads(p.read_text())
+    payload = json.loads(p.read_text(encoding="utf-8"))
     sections = payload.get("sections", {})
     data = sections.get(section)
     if data is None:
@@ -211,7 +211,7 @@ def list_results(data_dir: str, limit: int = 20) -> list[dict]:
     out = []
     for p in files[:limit]:
         try:
-            payload = json.loads(p.read_text())
+            payload = json.loads(p.read_text(encoding="utf-8"))
             meta = payload.get("meta", {})
             out.append({
                 "file": str(p),
