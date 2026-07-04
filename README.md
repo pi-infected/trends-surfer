@@ -119,19 +119,14 @@ to reuse an existing `DISPLAY`). `TTT_FORCE_XVFB` is a Linux-only knob — on
 Windows it's ignored since headful Chrome runs on the real desktop directly
 (a visible Chrome window will appear there).
 
-## Moving this plugin to a new Windows machine
+## Windows Installation
 
-Copying this folder to another Windows PC and installing it there is not just
-"copy + `/plugin install`" — a couple of machine-local pieces don't travel
-with the folder. If an AI agent is doing this setup, follow these steps in
+If an AI agent is doing this setup, follow these steps in
 order and verify each before moving on:
 
-1. **Copy the folder**, excluding `.venv/`, `.data/`, `research/`,
-   `__pycache__/` (all gitignored/generated — regenerate, don't copy; `.venv`
-   in particular is machine-specific and copying it will not work).
-2. **Check for `uv`**: run `uv --version`. If missing, install with
+1. **Check for `uv`**: run `uv --version`. If missing, install with
    `python -m pip install --user uv`, then re-check.
-3. **Install the browser binary** (this is the step that is easy to miss —
+2. **Install the browser binary** (this is the step that is easy to miss —
    it does *not* happen automatically when the MCP server starts):
    ```
    cd <copied-folder>
@@ -139,17 +134,17 @@ order and verify each before moving on:
    ```
    If it reports Chrome is already installed on the system, that's fine —
    `chrome_available()` will find it at the standard install path either way.
-4. **Register and install the plugin**:
+3. **Register and install the plugin**:
    ```
    /plugin marketplace add <absolute-path-to-copied-folder>
    /plugin install trends_surfer@trends-surfer-local
    /reload-plugins
    ```
-5. **Verify** by calling the `trends_health` tool. Expect
+4. **Verify** by calling the `trends_health` tool. Expect
    `"chrome_available": true` and `"xvfb_headful": true`. If either is
    `false`, re-check steps 2-3 rather than assuming the code is broken —
    this exact code was already verified working on Windows elsewhere.
-6. **Known gotcha on reinstall**: if the plugin is ever uninstalled and
+5. **Known gotcha on reinstall**: if the plugin is ever uninstalled and
    reinstalled in the same session, `/plugin install` can fail with
    `EPERM: operation not permitted, rm` on the plugin's cached `.venv`. This
    means a previous `trends-surfer-server`/`uv.exe`/`python.exe` process (from
