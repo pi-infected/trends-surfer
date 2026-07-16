@@ -156,8 +156,34 @@ order and verify each before moving on:
 ### Notes on Google's moving target
 
 Google's old `/api/dailytrends` JSON endpoint now returns 404, so trending-now
-is pulled from the current `/trending/rss?geo=XX` feed instead. Google also
-rate-limits the widget calls with HTTP 429 (heavily on datacenter IPs); the
-fetcher retries with an exponential backoff that honors `Retry-After`, and on a
-residential IP this is usually transient. The Google-facing logic is isolated in
-`trends.py` for easy re-adaptation when endpoints shift again.
+comes from the `/trending` UI (volumes, growth, age) with the
+`/trending/rss?geo=XX` feed as a fallback.
+
+Google rate-limits `/trends/api/widgetdata/*` hard with HTTP 429 — and the
+budget is only a handful of calls per session-window. **This bites hardest when
+you land on a page that spends the budget for you**: `/trends/explore?q=…` fires
+the same widget XHRs we're about to request, so the plugin used to 429 itself
+before asking for anything (fixed — `prepare_session` now lands on the neutral
+`/trends/` home). A 429 here means "these calls were already made", not "your IP
+is blocked": if you're debugging one, count the widget calls the page made
+before yours. The fetcher also retries with an exponential backoff honoring
+`Retry-After`.
+
+The Google-facing logic is isolated in `trends.py` for easy re-adaptation when
+endpoints shift again.
+
+### On search volume
+
+`trending_now` items carry a `volume` int parsed from Google's own label
+(`"5M+"` → `5000000`). Two caveats worth knowing before you build on it:
+
+- It is a **bucket floor**, not a count — `5M+` means "at least 5M", and Google
+  never publishes anything finer.
+- It exists **only for trending terms**. Google publishes no absolute volume for
+  an arbitrary keyword; `interest_over_time` is a 0-100 *relative* index, and no
+  amount of scraping turns it into searches/month. For that you need a keyword
+  tool (Keyword Planner, DataForSEO, …).
+
+Category filtering is not supported: `/trending?category=` is silently ignored
+by the page — the picker only applies through a UI click, so a category argument
+here would quietly return everything.

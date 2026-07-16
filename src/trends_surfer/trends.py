@@ -24,6 +24,7 @@ from urllib.parse import quote, urlencode
 EXPLORE_URL = "https://trends.google.com/trends/api/explore"
 WIDGET_BASE = "https://trends.google.com/trends/api/widgetdata"
 TRENDING_RSS_URL = "https://trends.google.com/trending/rss"
+TRENDING_UI_URL = "https://trends.google.com/trending"
 
 _WIDGET_ENDPOINT = {
     "TIMESERIES": "multiline",
@@ -277,6 +278,7 @@ async def fetch_all(
     include_region: bool = True,
     include_related: bool = True,
     include_trending: bool = False,
+    trending_hours: int = 24,
     region_resolution: str = "COUNTRY",
     hl: str = "en-US",
     tz: int = -120,
@@ -352,13 +354,25 @@ async def fetch_all(
     #    The old /api/dailytrends JSON endpoint now 404s; the current public
     #    feed is the Trending RSS at /trending/rss?geo=XX.
     if include_trending:
-        tgeo = (geo or "US").split("-")[0]  # RSS wants a country, not a sub-region
+        tgeo = (geo or "US").split("-")[0]  # wants a country, not a sub-region
+        # Prefer the UI: same volumes as the RSS but with growth, age and a
+        # configurable window. Fall back to the RSS feed if the page shape
+        # shifts — it's the same data, minus the extras.
         try:
-            await _jitter()
-            xml = await _fetch_text(page, f"{TRENDING_RSS_URL}?geo={quote(tgeo)}")
-            sections["trending_now"] = {"geo": tgeo, "items": _parse_trending_rss(xml)}
-        except TrendsError as e:
-            sections["trending_now"] = {"geo": tgeo, "error": str(e)}
+            items = await fetch_trending_now_ui(page, tgeo, trending_hours)
+            sections["trending_now"] = {
+                "geo": tgeo, "hours": trending_hours, "source": "ui", "items": items,
+            }
+        except (TrendsError, Exception) as ui_err:  # noqa: BLE001 — RSS is the safety net
+            try:
+                await _jitter()
+                xml = await _fetch_text(page, f"{TRENDING_RSS_URL}?geo={quote(tgeo)}")
+                sections["trending_now"] = {
+                    "geo": tgeo, "source": "rss", "items": _parse_trending_rss(xml),
+                    "ui_error": str(ui_err),
+                }
+            except TrendsError as e:
+                sections["trending_now"] = {"geo": tgeo, "error": str(e)}
 
     return sections
 
@@ -370,9 +384,95 @@ def _parse_trending_rss(xml: str) -> list[dict]:
         title = re.search(r"<title>(.*?)</title>", block, re.S)
         traffic = re.search(r"<ht:approx_traffic>(.*?)</ht:approx_traffic>", block, re.S)
         news = re.findall(r"<ht:news_item_title>(.*?)</ht:news_item_title>", block, re.S)
+        label = _unescape(traffic.group(1)) if traffic else None
         items.append({
             "title": _unescape(title.group(1)) if title else None,
-            "traffic": _unescape(traffic.group(1)) if traffic else None,
+            "traffic": label,
+            "volume": parse_volume_label(label),
             "articles": [_unescape(n) for n in news[:2]],
+        })
+    return items
+
+
+# Thousands separators include the plain, non-breaking and narrow spaces the
+# RSS emits on non-English geos ("1 000+"), which a bare \d+ would cut at 1.
+_VOLUME_SEPS = ",   "
+_VOLUME_RE = re.compile(r"(\d[\d.,   ]*?)\s*([KMB])?\s*\+", re.I)
+_VOLUME_MULT = {"k": 1_000, "m": 1_000_000, "b": 1_000_000_000}
+
+
+def parse_volume_label(label: str | None) -> int | None:
+    """``"5M+"`` / ``"2,000+"`` -> ``5000000`` / ``2000``.
+
+    Google only ever publishes a BUCKET FLOOR, never an exact count: a term
+    shown as ``5M+`` had somewhere between 5M and the next bucket. Treat the
+    result as "at least this many searches", not a measurement — and note it
+    exists only for *trending* terms. Google publishes no absolute volume for
+    an arbitrary keyword; interest-over-time stays a 0-100 relative index.
+    """
+    if not label:
+        return None
+    m = _VOLUME_RE.search(label.strip())
+    if not m:
+        return None
+    digits = m.group(1)
+    for sep in _VOLUME_SEPS:
+        digits = digits.replace(sep, "")
+    try:
+        n = float(digits)
+    except ValueError:
+        return None
+    return int(n * _VOLUME_MULT.get((m.group(2) or "").lower(), 1))
+
+
+async def fetch_trending_now_ui(page, geo: str = "US", hours: int = 24) -> list[dict]:
+    """Trending searches WITH their published search volume, scraped from the UI.
+
+    Why the DOM and not an API: the volume lives in the ``fXqlme`` batchexecute
+    RPC, whose payload carries a ~2.3 KB opaque session token we would have to
+    forge and keep working. The rendered table exposes the same figures (plus
+    growth, age and the term breakdown), so we let the page do its own
+    authenticated call and read the result — no extra request against Google's
+    tight widget budget (see :func:`prepare_session`).
+
+    ``hours`` maps to the UI's window (24 / 48 / 168). Category filtering is NOT
+    supported: ``&category=`` is ignored by the page — the picker only applies
+    through a UI click, so asking for one here would silently return everything.
+    """
+    url = f"{TRENDING_UI_URL}?geo={quote(geo)}&hl=en-US&hours={int(hours)}"
+    await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+    try:
+        # state="attached", NOT the default "visible": the table's first row is
+        # an empty spacer that never becomes visible, so waiting on visibility
+        # times out while the 25 real rows sit right behind it.
+        await page.wait_for_selector("table tbody tr", state="attached", timeout=30000)
+    except Exception as e:  # noqa: BLE001 — surface as a TrendsError like the rest
+        raise TrendsError(f"trending UI rendered no rows for geo={geo}") from e
+
+    rows = await page.locator("table tbody tr").all_inner_texts()
+    items = []
+    for raw in rows:
+        # Cells arrive tab-separated; the icon fonts leak in as words we drop.
+        cells = [c.strip() for c in raw.split("\t") if c.strip()]
+        if len(cells) < 2:
+            continue
+        parts = [p.strip() for p in cells[0].split("\n") if p.strip()]
+        if not parts:
+            continue
+        title = parts[0]
+        label = next((p for p in parts[1:] if _VOLUME_RE.fullmatch(p)), None)
+        growth = next((p for p in parts if p.endswith("%")), None)
+        started = cells[1].split("\n")[0].strip() if len(cells) > 1 else None
+        related = [
+            p for p in (cells[2].split("\n") if len(cells) > 2 else [])
+            if p.strip() and not p.startswith("+")
+        ]
+        items.append({
+            "title": title,
+            "traffic": label,
+            "volume": parse_volume_label(label),
+            "growth": growth,
+            "started": started,
+            "articles": related[:2],
         })
     return items

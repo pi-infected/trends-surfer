@@ -45,6 +45,7 @@ async def main(a: argparse.Namespace) -> None:
                 include_region=not a.no_region,
                 include_related=not a.no_related,
                 include_trending=a.trending,
+                trending_hours=a.trending_hours,
             )
 
     meta = {
@@ -66,6 +67,8 @@ if __name__ == "__main__":
     ap.add_argument("--geo", default="")
     ap.add_argument("--gprop", default="")
     ap.add_argument("--trending", action="store_true")
+    ap.add_argument("--trending-hours", type=int, default=24,
+                    help="trending window: 24, 48 or 168 (past 7 days)")
     ap.add_argument("--no-region", action="store_true")
     ap.add_argument("--no-related", action="store_true")
     asyncio.run(main(ap.parse_args()))
