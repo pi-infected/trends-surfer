@@ -231,17 +231,32 @@ def _parse_related(data) -> dict:
 # ── orchestration ────────────────────────────────────────────────────────────
 
 async def prepare_session(page, keywords, geo) -> dict:
-    """Navigate to the Trends explore UI to warm cookies + same-origin context.
+    """Warm cookies + same-origin context on a NEUTRAL Trends page.
+
+    Do NOT land on ``/trends/explore?q=<keywords>``: that page's own JS fires
+    the very widget XHRs we are about to request (multiline, comparedgeo,
+    relatedsearches). Google's budget for ``/trends/api/widgetdata/*`` is only
+    a handful of calls per session-window — measured 2026-07-16, the page's own
+    4th widget call already came back 429. So the UI burned the budget and our
+    identical calls were then refused: the plugin was rate-limiting itself, and
+    it looked exactly like an IP-level block.
+
+    The widget endpoints only need same-origin cookies, not an explore referer,
+    so the bare ``/trends/`` home is enough — and it fires no api calls at all.
+
+    ``keywords``/``geo`` are kept in the signature: they no longer shape the
+    landing URL, but callers pass them and a future consent/geo cookie step may
+    want them again.
 
     Returns the protection status from :mod:`consent`.
     """
     from .consent import pass_protections
 
-    q = quote(",".join(keywords))
-    url = f"https://trends.google.com/trends/explore?q={q}"
-    if geo:
-        url += f"&geo={quote(geo)}"
-    await page.goto(url, wait_until="domcontentloaded", timeout=45000)
+    await page.goto(
+        "https://trends.google.com/trends/",
+        wait_until="domcontentloaded",
+        timeout=45000,
+    )
     status = await pass_protections(page)
     # Let any deferred XHRs / cookie set complete.
     try:
